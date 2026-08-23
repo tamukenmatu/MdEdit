@@ -265,6 +265,22 @@ fn show_in_finder(path: String) -> Result<(), String> {
             .spawn()
             .map_err(|e| format!("Failed to reveal in Finder: {}", e))?;
     }
+    #[cfg(target_os = "windows")]
+    {
+        Command::new("explorer")
+            .arg(format!("/select,{}", path))
+            .spawn()
+            .map_err(|e| format!("Failed to reveal in Explorer: {}", e))?;
+    }
+    #[cfg(target_os = "linux")]
+    {
+        if let Some(parent) = p.parent() {
+            Command::new("xdg-open")
+                .arg(parent)
+                .spawn()
+                .map_err(|e| format!("Failed to open directory: {}", e))?;
+        }
+    }
     Ok(())
 }
 
