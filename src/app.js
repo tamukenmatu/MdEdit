@@ -116,6 +116,7 @@ const elements = {
   menuCopyHtml: document.getElementById('menu-copy-html'),
   menuExportHtml: document.getElementById('menu-export-html'),
   menuPrintPdf: document.getElementById('menu-print-pdf'),
+  menuCheckUpdate: document.getElementById('menu-check-update'),
   menuShowFinder: document.getElementById('menu-show-finder'),
   toastContainer: document.getElementById('toast-container')
 };
@@ -1659,11 +1660,66 @@ if (elements.menuResetPaletteOrder) {
   elements.menuResetPaletteOrder.addEventListener('click', resetPaletteOrder);
 }
 
+// Auto Update Checker (Tauri Updater Plugin)
+async function checkForUpdates(manual = true) {
+  if (!isTauri) {
+    showToast('アップデート確認はデスクトップアプリ版でのみ利用可能です', 'info');
+    return;
+  }
+
+  try {
+    if (manual) showToast('最新アップデートを確認中...', 'info', 2000);
+    const { check } = await import('@tauri-apps/plugin-updater');
+    const update = await check();
+
+    if (update) {
+      const confirmUpdate = confirm(
+        `新しいバージョン (v${update.version}) が利用可能です！\n\n更新内容:\n${update.body || '機能改善とバグ修正'}\n\n今すぐアップデートをダウンロードして再起動しますか？`
+      );
+
+      if (confirmUpdate) {
+        showToast(`v${update.version} をダウンロード中...`, 'info', 6000);
+        let downloaded = 0;
+        let contentLength = 0;
+
+        await update.downloadAndInstall((event) => {
+          switch (event.event) {
+            case 'Started':
+              contentLength = event.data.contentLength || 0;
+              break;
+            case 'Progress':
+              downloaded += event.data.chunkLength;
+              break;
+            case 'Finished':
+              showToast('アップデート完了！アプリを再起動します', 'success', 2500);
+              break;
+          }
+        });
+
+        const { relaunch } = await import('@tauri-apps/plugin-process');
+        await relaunch();
+      }
+    } else {
+      if (manual) {
+        showToast('お使いの MdEdit は最新バージョンです', 'success');
+      }
+    }
+  } catch (err) {
+    console.error('Update check error:', err);
+    if (manual) {
+      showToast(`アップデート確認エラー: ${err.message || err}`, 'error');
+    }
+  }
+}
+
 elements.menuSaveAs.addEventListener('click', saveFileAs);
 elements.menuCopyMd.addEventListener('click', copyMarkdown);
 elements.menuCopyHtml.addEventListener('click', copyHtml);
 elements.menuExportHtml.addEventListener('click', exportHtmlFile);
 elements.menuPrintPdf.addEventListener('click', () => window.print());
+if (elements.menuCheckUpdate) {
+  elements.menuCheckUpdate.addEventListener('click', () => checkForUpdates(true));
+}
 elements.menuShowFinder.addEventListener('click', showInFinder);
 
 // Initialize Application

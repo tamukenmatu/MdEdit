@@ -297,6 +297,8 @@ pub fn run() {
     let initial_file_clone = initial_file_state.clone();
 
     let app = tauri::Builder::default()
+        .plugin(tauri_plugin_updater::Builder::new().build())
+        .plugin(tauri_plugin_process::init())
         .manage(AppState {
             initial_file: initial_file_state,
         })
