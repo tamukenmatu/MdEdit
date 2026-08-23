@@ -19,6 +19,12 @@ const ICONS = {
 
 const DEFAULT_VAULT_PATH = '/Users/km1/Library/Mobile Documents/iCloud~md~obsidian/Documents/01KEN';
 
+const savedObsidianMode = localStorage.getItem('mdedit_obsidian_mode');
+const obsidianMode = savedObsidianMode !== null ? (savedObsidianMode === 'true') : false;
+const savedTab = localStorage.getItem('mdedit_active_sidebar_tab');
+// Default to 'toc' if obsidianMode is off; if obsidianMode is on, default to 'vault' (or saved tab)
+const defaultTab = savedTab ? savedTab : (obsidianMode ? 'vault' : 'toc');
+
 // Application State
 const state = {
   filePath: null,
@@ -31,8 +37,9 @@ const state = {
   palettePinned: localStorage.getItem('mdedit_palette_pinned') === 'true',
   zoomLevel: parseFloat(localStorage.getItem('mdedit_zoom_level')) || 1.0,
   mode: 'view', // 'view' | 'edit' | 'split'
-  sidebarOpen: true,
-  activeSidebarTab: 'vault', // 'vault' | 'toc'
+  sidebarOpen: localStorage.getItem('mdedit_sidebar_open') !== 'false',
+  activeSidebarTab: defaultTab, // 'toc' | 'vault'
+  obsidianMode: obsidianMode,
   vaultPath: localStorage.getItem('mdedit_vault_path') || DEFAULT_VAULT_PATH,
   vaultTree: [],
   vaultFilesMap: new Map(), // lowercased basename without ext -> full path
@@ -581,6 +588,8 @@ function setMode(mode) {
 // Sidebar Tab Switching (Vault ⇄ TOC)
 function switchSidebarTab(tab) {
   state.activeSidebarTab = tab;
+  localStorage.setItem('mdedit_active_sidebar_tab', tab);
+
   elements.tabVault.classList.toggle('active', tab === 'vault');
   elements.tabToc.classList.toggle('active', tab === 'toc');
   elements.panelVault.classList.toggle('active', tab === 'vault');
@@ -592,10 +601,28 @@ function switchSidebarTab(tab) {
   }
 }
 
-// Toggle Obsidian Vault Mode
+// Sync Obsidian Mode UI Indicator
+function syncObsidianModeUI() {
+  elements.btnObsidianVault.classList.toggle('active', state.obsidianMode);
+  const indicator = document.getElementById('vault-switch-indicator');
+  if (indicator) {
+    indicator.textContent = state.obsidianMode ? 'ON' : 'OFF';
+  }
+}
+
+// Toggle Obsidian Vault Mode (ON / OFF switch)
 function toggleObsidianMode() {
-  switchSidebarTab('vault');
-  elements.btnObsidianVault.classList.toggle('active', true);
+  state.obsidianMode = !state.obsidianMode;
+  localStorage.setItem('mdedit_obsidian_mode', state.obsidianMode);
+
+  if (state.obsidianMode) {
+    switchSidebarTab('vault');
+    showToast('Obsidian モード: ON (書庫リスト)', 'info', 1800);
+  } else {
+    switchSidebarTab('toc');
+    showToast('Obsidian モード: OFF (目次)', 'info', 1800);
+  }
+  syncObsidianModeUI();
 }
 
 // Vault Explorer Tree Builder
@@ -1194,7 +1221,9 @@ window.addEventListener('keydown', (e) => {
 
 function toggleSidebar() {
   state.sidebarOpen = !state.sidebarOpen;
+  localStorage.setItem('mdedit_sidebar_open', state.sidebarOpen);
   elements.body.classList.toggle('sidebar-open', state.sidebarOpen);
+  elements.btnToggleSidebar.classList.toggle('active', state.sidebarOpen);
 }
 
 // Drag and Drop Files
@@ -1731,6 +1760,12 @@ async function init() {
   updatePalettePinUI();
   applyPaletteOrder();
   initPaletteDragAndDrop();
+
+  // Restore Sidebar & Obsidian state from previous session
+  elements.body.classList.toggle('sidebar-open', state.sidebarOpen);
+  elements.btnToggleSidebar.classList.toggle('active', state.sidebarOpen);
+  switchSidebarTab(state.activeSidebarTab);
+  syncObsidianModeUI();
 
   // Initialize Vault Tree in background
   loadVaultTree();
