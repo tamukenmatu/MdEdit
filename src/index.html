@@ -92,19 +92,39 @@
         </div>
       </div>
 
-      <!-- Right: Action Buttons & Statistics -->
+      <!-- Right: Search Bar & Action Buttons -->
       <div class="header-right">
-        <!-- Quick Stats -->
-        <div class="stats-badge" id="stats-badge" title="ドキュメント統計">
-          <span id="stat-words">0 単語</span>
-          <span class="stat-divider">/</span>
-          <span id="stat-chars">0 文字</span>
-          <span class="stat-divider">/</span>
-          <span id="stat-lines">1 行</span>
+        <!-- Integrated Header Search Bar -->
+        <div class="header-search-container" id="search-container">
+          <div class="header-search-box">
+            <svg class="svg-icon svg-icon-sm search-icon" viewBox="0 0 24 24">
+              <circle cx="11" cy="11" r="8"></circle>
+              <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+            </svg>
+            <input type="text" id="search-input" placeholder="検索... (Cmd+F)" spellcheck="false" autocomplete="off" />
+            <span id="search-count" class="search-count">0 / 0</span>
+            <button id="btn-search-prev" class="search-nav-btn" title="前を検索 (Cmd+Shift+G / Shift+Enter)">
+              <svg class="svg-icon svg-icon-sm" viewBox="0 0 24 24">
+                <polyline points="18 15 12 9 6 15"></polyline>
+              </svg>
+            </button>
+            <button id="btn-search-next" class="search-nav-btn" title="次を検索 (Cmd+G / Enter)">
+              <svg class="svg-icon svg-icon-sm" viewBox="0 0 24 24">
+                <polyline points="6 9 12 15 18 9"></polyline>
+              </svg>
+            </button>
+            <button id="btn-search-clear" class="search-nav-btn" title="検索クリア / 閉じる (Esc)">
+              <svg class="svg-icon svg-icon-sm" viewBox="0 0 24 24">
+                <line x1="18" y1="6" x2="6" y2="18"></line>
+                <line x1="6" y1="6" x2="18" y2="18"></line>
+              </svg>
+            </button>
+          </div>
         </div>
 
         <!-- Action Buttons -->
         <div class="action-group">
+
           <button id="btn-new" class="icon-btn" title="新規作成 (Cmd+N)">
             <svg class="svg-icon" viewBox="0 0 24 24">
               <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
@@ -624,7 +644,13 @@
         <span class="footer-item" id="footer-file-encoding">UTF-8</span>
       </div>
       <div class="footer-right">
-        <span class="footer-item" id="footer-reading-time">読了目安: 1分未満</span>
+        <div class="footer-stats" id="stats-badge" title="ドキュメント統計">
+          <span id="stat-words">0 単語</span>
+          <span class="footer-stat-divider">/</span>
+          <span id="stat-chars">0 文字</span>
+          <span class="footer-stat-divider">/</span>
+          <span id="stat-lines">1 行</span>
+        </div>
       </div>
     </footer>
   </div>

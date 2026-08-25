@@ -125,6 +125,11 @@ const elements = {
   menuPrintPdf: document.getElementById('menu-print-pdf'),
   menuCheckUpdate: document.getElementById('menu-check-update'),
   menuShowFinder: document.getElementById('menu-show-finder'),
+  btnSearchClear: document.getElementById('btn-search-clear'),
+  searchInput: document.getElementById('search-input'),
+  searchCount: document.getElementById('search-count'),
+  btnSearchPrev: document.getElementById('btn-search-prev'),
+  btnSearchNext: document.getElementById('btn-search-next'),
   toastContainer: document.getElementById('toast-container')
 };
 
@@ -361,9 +366,6 @@ function updateStats(content) {
   elements.statLines.textContent = `${lines} 行`;
   elements.statChars.textContent = `${chars.toLocaleString()} 文字`;
   elements.statWords.textContent = `${words.toLocaleString()} 単語`;
-
-  const minutes = Math.max(1, Math.ceil(words / 400));
-  elements.readingTime.textContent = `読了目安: 約${minutes}分`;
 }
 
 // Update Line Numbers Gutter
@@ -554,6 +556,11 @@ function renderMarkdown() {
 
   // Check dirty state
   setDirty(state.currentContent !== state.savedContent);
+
+  // Re-apply search highlights if search is open
+  if (typeof searchState !== 'undefined' && searchState.isOpen && searchState.query) {
+    performSearch(searchState.query);
+  }
 }
 
 // Dirty status indicator
@@ -579,6 +586,10 @@ function setMode(mode) {
   elements.modeView.classList.toggle('active', mode === 'view');
   elements.modeEdit.classList.toggle('active', mode === 'edit');
   elements.modeSplit.classList.toggle('active', mode === 'split');
+
+  if (typeof searchState !== 'undefined' && searchState.isOpen && searchState.query) {
+    performSearch(searchState.query);
+  }
 
   if (mode === 'edit' || mode === 'split') {
     elements.editor.focus();
@@ -1178,7 +1189,19 @@ elements.editor.addEventListener('input', () => {
 window.addEventListener('keydown', (e) => {
   const isCmdOrCtrl = e.metaKey || e.ctrlKey;
   
-  if (isCmdOrCtrl && !e.shiftKey && e.key.toLowerCase() === 's') {
+  if (isCmdOrCtrl && !e.shiftKey && e.key.toLowerCase() === 'f') {
+    e.preventDefault();
+    openSearchBar();
+  } else if (isCmdOrCtrl && !e.shiftKey && e.key.toLowerCase() === 'g') {
+    e.preventDefault();
+    findNextMatch(1);
+  } else if (isCmdOrCtrl && e.shiftKey && e.key.toLowerCase() === 'g') {
+    e.preventDefault();
+    findNextMatch(-1);
+  } else if (e.key === 'Escape' && searchState.isOpen) {
+    e.preventDefault();
+    closeSearchBar();
+  } else if (isCmdOrCtrl && !e.shiftKey && e.key.toLowerCase() === 's') {
     e.preventDefault();
     saveFile();
   } else if (isCmdOrCtrl && e.shiftKey && e.key.toLowerCase() === 's') {
@@ -1629,6 +1652,244 @@ function resetPaletteOrder() {
   setTimeout(() => location.reload(), 400);
 }
 
+// ==========================================
+// In-Document Search & Highlight System (Cmd+F / Cmd+G)
+// ==========================================
+const searchState = {
+  isOpen: false,
+  query: '',
+  matches: [],
+  currentIndex: -1
+};
+
+function openSearchBar() {
+  if (!elements.searchInput) return;
+  searchState.isOpen = true;
+
+  // Pre-fill selected text if available
+  let selectedText = '';
+  if (state.mode === 'edit' || state.mode === 'split') {
+    const selStart = elements.editor.selectionStart;
+    const selEnd = elements.editor.selectionEnd;
+    if (selStart !== selEnd) {
+      selectedText = elements.editor.value.substring(selStart, selEnd).trim();
+    }
+  } else {
+    const sel = window.getSelection();
+    if (sel && sel.toString()) {
+      selectedText = sel.toString().trim();
+    }
+  }
+
+  if (selectedText && selectedText.length < 50 && !selectedText.includes('\n')) {
+    elements.searchInput.value = selectedText;
+  }
+
+  elements.searchInput.focus();
+  elements.searchInput.select();
+  performSearch(elements.searchInput.value);
+}
+
+function closeSearchBar() {
+  searchState.isOpen = false;
+  if (elements.searchInput) {
+    elements.searchInput.value = '';
+    elements.searchInput.blur();
+  }
+  clearSearchHighlights();
+  searchState.matches = [];
+  searchState.currentIndex = -1;
+  searchState.query = '';
+  if (elements.searchCount) {
+    elements.searchCount.textContent = '0 / 0';
+  }
+
+  // Return focus to active workspace
+  if (state.mode === 'edit' || state.mode === 'split') {
+    elements.editor.focus();
+  }
+}
+
+function clearSearchHighlights() {
+  // Remove mark.mdedit-search-match in preview
+  const marks = elements.preview.querySelectorAll('mark.mdedit-search-match');
+  marks.forEach(mark => {
+    const parent = mark.parentNode;
+    if (parent) {
+      parent.replaceChild(document.createTextNode(mark.textContent), mark);
+      parent.normalize();
+    }
+  });
+}
+
+function highlightInPreview(query) {
+  clearSearchHighlights();
+  if (!query) return [];
+
+  const matches = [];
+  const walker = document.createTreeWalker(
+    elements.preview,
+    NodeFilter.SHOW_TEXT,
+    {
+      acceptNode(node) {
+        if (!node.nodeValue || !node.nodeValue.trim()) return NodeFilter.FILTER_REJECT;
+        // Ignore scripts, styles
+        const parentTag = node.parentElement ? node.parentElement.tagName : '';
+        if (['SCRIPT', 'STYLE'].includes(parentTag)) return NodeFilter.FILTER_REJECT;
+        return NodeFilter.FILTER_ACCEPT;
+      }
+    }
+  );
+
+  const textNodes = [];
+  let currentNode;
+  while ((currentNode = walker.nextNode())) {
+    textNodes.push(currentNode);
+  }
+
+  const lowerQuery = query.toLowerCase();
+
+  textNodes.forEach(node => {
+    const text = node.nodeValue;
+    const lowerText = text.toLowerCase();
+    let index = lowerText.indexOf(lowerQuery);
+
+    if (index !== -1) {
+      const fragment = document.createDocumentFragment();
+      let lastIndex = 0;
+
+      while (index !== -1) {
+        // Text before match
+        if (index > lastIndex) {
+          fragment.appendChild(document.createTextNode(text.substring(lastIndex, index)));
+        }
+
+        // Highlighted match
+        const mark = document.createElement('mark');
+        mark.className = 'mdedit-search-match';
+        mark.textContent = text.substring(index, index + query.length);
+        fragment.appendChild(mark);
+        matches.push(mark);
+
+        lastIndex = index + query.length;
+        index = lowerText.indexOf(lowerQuery, lastIndex);
+      }
+
+      // Remaining text
+      if (lastIndex < text.length) {
+        fragment.appendChild(document.createTextNode(text.substring(lastIndex)));
+      }
+
+      if (node.parentNode) {
+        node.parentNode.replaceChild(fragment, node);
+      }
+    }
+  });
+
+  return matches;
+}
+
+function performSearch(query) {
+  searchState.query = query;
+
+  if (!query) {
+    clearSearchHighlights();
+    searchState.matches = [];
+    searchState.currentIndex = -1;
+    if (elements.searchCount) {
+      elements.searchCount.textContent = '0 / 0';
+    }
+    return;
+  }
+
+  if (state.mode === 'edit') {
+    // Editor search mode (find all indices in textarea)
+    const text = elements.editor.value;
+    const lowerText = text.toLowerCase();
+    const lowerQuery = query.toLowerCase();
+    const indices = [];
+    let idx = lowerText.indexOf(lowerQuery);
+    while (idx !== -1) {
+      indices.push(idx);
+      idx = lowerText.indexOf(lowerQuery, idx + query.length);
+    }
+    searchState.matches = indices;
+    if (indices.length > 0) {
+      searchState.currentIndex = 0;
+      jumpToMatch(0);
+    } else {
+      searchState.currentIndex = -1;
+    }
+    updateSearchCountUI();
+  } else {
+    // View or Split mode: highlight in rendered preview DOM
+    const markElements = highlightInPreview(query);
+    searchState.matches = markElements;
+    if (markElements.length > 0) {
+      searchState.currentIndex = 0;
+      jumpToMatch(0);
+    } else {
+      searchState.currentIndex = -1;
+    }
+    updateSearchCountUI();
+  }
+}
+
+function updateSearchCountUI() {
+  if (!elements.searchCount) return;
+  const total = searchState.matches.length;
+  const current = total > 0 && searchState.currentIndex >= 0 ? searchState.currentIndex + 1 : 0;
+  elements.searchCount.textContent = `${current} / ${total}`;
+}
+
+function jumpToMatch(index) {
+  if (searchState.matches.length === 0) return;
+  if (index < 0) index = searchState.matches.length - 1;
+  if (index >= searchState.matches.length) index = 0;
+  searchState.currentIndex = index;
+
+  updateSearchCountUI();
+
+  if (state.mode === 'edit') {
+    // Textarea selection jump
+    const pos = searchState.matches[index];
+    if (typeof pos === 'number') {
+      elements.editor.focus();
+      elements.editor.setSelectionRange(pos, pos + searchState.query.length);
+
+      // Scroll textarea to selection line
+      const linesBefore = elements.editor.value.substring(0, pos).split('\n').length;
+      const totalLines = elements.editor.value.split('\n').length;
+      const lineHeight = elements.editor.scrollHeight / (totalLines || 1);
+      elements.editor.scrollTop = Math.max(0, (linesBefore - 5) * lineHeight);
+    }
+  } else {
+    // Preview mark element jump
+    elements.preview.querySelectorAll('mark.mdedit-search-match').forEach(m => m.classList.remove('active-match'));
+    const mark = searchState.matches[index];
+    if (mark && mark.classList) {
+      mark.classList.add('active-match');
+      mark.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'nearest' });
+    }
+  }
+}
+
+function findNextMatch(direction = 1) {
+  if (!searchState.isOpen) {
+    openSearchBar();
+    return;
+  }
+  if (searchState.matches.length === 0) {
+    if (elements.searchInput && elements.searchInput.value) {
+      performSearch(elements.searchInput.value);
+    }
+    return;
+  }
+  const nextIdx = searchState.currentIndex + direction;
+  jumpToMatch(nextIdx);
+}
+
+
 // Sidebar Tab switching
 elements.tabVault.addEventListener('click', () => switchSidebarTab('vault'));
 elements.tabToc.addEventListener('click', () => switchSidebarTab('toc'));
@@ -1650,6 +1911,33 @@ elements.btnToggleSidebar.addEventListener('click', toggleSidebar);
 if (elements.btnBrand) {
   elements.btnBrand.addEventListener('click', showWelcomeManual);
 }
+// Search Bar Event Listeners
+if (elements.btnSearchClear) {
+  elements.btnSearchClear.addEventListener('click', () => {
+    closeSearchBar();
+  });
+}
+if (elements.btnSearchNext) {
+  elements.btnSearchNext.addEventListener('click', () => findNextMatch(1));
+}
+if (elements.btnSearchPrev) {
+  elements.btnSearchPrev.addEventListener('click', () => findNextMatch(-1));
+}
+if (elements.searchInput) {
+  elements.searchInput.addEventListener('input', (e) => {
+    performSearch(e.target.value);
+  });
+  elements.searchInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      findNextMatch(e.shiftKey ? -1 : 1);
+    } else if (e.key === 'Escape') {
+      e.preventDefault();
+      closeSearchBar();
+    }
+  });
+}
+
 elements.btnNew.addEventListener('click', newFile);
 elements.btnOpen.addEventListener('click', openFile);
 elements.btnSaveToVault.addEventListener('click', saveToObsidianVault);

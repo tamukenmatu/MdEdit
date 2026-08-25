@@ -90,6 +90,9 @@ Finder 上の Markdown ドキュメントを瞬時に開き、洗練されたダ
 | :--- | :--- |
 | \`Cmd + S\` | 現在のファイルを上書き保存 |
 | \`Cmd + Shift + S\` | 名前を付けて保存 |
+| \`Cmd + F\` | ドキュメント内テキスト検索バーの表示 |
+| \`Cmd + G\` / \`Enter\` | 次の一致箇所へ移動 (Next Match) |
+| \`Cmd + Shift + G\` / \`Shift + Enter\` | 前の一致箇所へ移動 (Prev Match) |
 | \`Cmd + E\` | 表示モード切り替え（View ⇄ Edit ⇄ Split） |
 | \`Cmd + O\` | ファイルを開くダイアログ |
 | \`Cmd + N\` | 新規ドキュメント作成 |
