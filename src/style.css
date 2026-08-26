@@ -1811,8 +1811,14 @@ body.mode-split .preview-pane {
 }
 
 /* ==========================================================================
-   Responsive Header & Overflow Protection
+   Responsive Header (Clean Single Row + Popup Search on Narrow)
    ========================================================================== */
+
+.app-header {
+  height: var(--header-height);
+  min-height: var(--header-height);
+  flex-wrap: nowrap;
+}
 
 .header-left {
   min-width: 0;
@@ -1829,8 +1835,8 @@ body.mode-split .preview-pane {
   margin-left: auto;
 }
 
-/* Step 1: Medium width (<= 950px) */
-@media (max-width: 950px) {
+/* Medium-narrow: shrink search input slightly */
+@media (max-width: 900px) {
   #search-input {
     width: 100px;
   }
@@ -1838,72 +1844,54 @@ body.mode-split .preview-pane {
     width: 130px;
   }
   .file-info-container {
-    max-width: 160px;
+    max-width: 180px;
   }
 }
 
-/* Step 2: 2-Row Header Layout (<= 850px) - No overflow, perfect layout */
-@media (max-width: 850px) {
-  .app-header {
-    height: auto;
-    min-height: var(--header-height);
-    flex-wrap: wrap;
-    padding: 8px 14px;
-    gap: 8px 12px;
+/* Narrow width (<= 760px): Collapse search bar into popup icon button */
+@media (max-width: 760px) {
+  .search-toggle-btn {
+    display: inline-flex;
   }
 
-  /* Row 1: Left (Brand + File Info) & Right (3-dots menu) */
-  .header-left {
-    order: 1;
-    flex-grow: 1;
-    max-width: calc(100% - 46px);
+  .header-search-box {
+    display: none;
+    position: absolute;
+    top: calc(100% + 8px);
+    right: 0;
+    z-index: 100;
+    background: var(--bg-secondary);
+    border: 1px solid var(--accent-primary);
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5);
+    border-radius: var(--radius-md);
+    padding: 4px 8px;
+    height: 38px;
   }
 
-  .header-right {
-    order: 2;
-    flex-grow: 0;
-    margin-left: auto;
-  }
-
-  /* Keep 3-dots right aligned in row 1, search moves cleanly into row 2 */
-  .header-right .header-search-container {
+  .header-search-container.search-expanded .header-search-box {
     display: flex;
-  }
-
-  /* Row 2: Center Controls & Search Bar nicely spaced */
-  .header-center {
-    order: 3;
-    width: 100%;
-    justify-content: flex-start;
-    padding-top: 4px;
-    border-top: 1px solid rgba(255, 255, 255, 0.05);
-  }
-
-  .header-mode-group {
-    width: 100%;
-    justify-content: flex-start;
-    gap: 10px;
-  }
-
-  .header-left .file-info-container {
-    max-width: calc(100% - 130px);
+    animation: fadeIn 0.15s ease;
   }
 
   #search-input {
-    width: 120px;
+    width: 160px;
+  }
+  #search-input:focus {
+    width: 180px;
+  }
+
+  .file-info-container {
+    max-width: 140px;
   }
 }
 
-/* Step 3: Very narrow 2-row adjustments (<= 580px) */
+/* Very narrow width (<= 580px) */
 @media (max-width: 580px) {
   .brand-title {
     display: none;
   }
-  .header-left .file-info-container {
-    max-width: 180px;
-  }
-  #search-input {
-    width: 80px;
+  .file-info-container {
+    max-width: 110px;
   }
 }
 
