@@ -17,7 +17,7 @@ const ICONS = {
   chevron: `<svg class="svg-icon tree-chevron" viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"></polyline></svg>`
 };
 
-const DEFAULT_VAULT_PATH = '/Users/km1/Library/Mobile Documents/iCloud~md~obsidian/Documents/01KEN';
+const DEFAULT_VAULT_PATH = '';
 
 const savedObsidianMode = localStorage.getItem('mdedit_obsidian_mode');
 const obsidianMode = savedObsidianMode !== null ? (savedObsidianMode === 'true') : false;
@@ -809,7 +809,23 @@ function highlightActiveTreeFile(path) {
 
 // Load Vault Directory Tree
 async function loadVaultTree() {
-  const vaultName = state.vaultPath.split('/').filter(Boolean).pop() || 'Vault';
+  if (!state.vaultPath) {
+    elements.vaultTitle.textContent = '未設定';
+    elements.vaultBtnLabel.textContent = '保管庫';
+    elements.vaultTree.innerHTML = `
+      <div class="vault-empty-state" style="padding: 24px 16px; text-align: center;">
+        <p style="font-size: 12px; color: var(--text-muted); margin-bottom: 12px;">Obsidian 保管庫フォルダが未設定です</p>
+        <button id="btn-vault-setup-pick" class="btn-primary" style="font-size: 12px; padding: 6px 12px; border-radius: var(--radius-sm); border: none; background: var(--accent-primary); color: #000; cursor: pointer; font-weight: 600;">フォルダを選択...</button>
+      </div>
+    `;
+    const btnSetup = document.getElementById('btn-vault-setup-pick');
+    if (btnSetup) {
+      btnSetup.addEventListener('click', changeVaultFolder);
+    }
+    return;
+  }
+
+  const vaultName = state.vaultPath.split('/').filter(Boolean).pop() || '保管庫';
   elements.vaultTitle.textContent = vaultName;
   elements.vaultBtnLabel.textContent = vaultName;
 
