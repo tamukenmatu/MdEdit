@@ -38,10 +38,13 @@
     ],
     "fileAssociations": [
       {
-        "ext": ["md", "markdown", "mdown", "mkd", "mkdn", "txt"],
-        "name": "Markdown Document",
+        "ext": [
+          "md", "markdown", "mdown", "mkd", "mkdn",
+          "txt", "csv", "tsv", "log", "py", "js", "ts", "json", "yml", "yaml", "sh", "zsh", "bash", "css", "html", "toml", "conf", "ini", "env", "sql", "rs", "rb", "go", "c", "cpp", "h"
+        ],
+        "name": "Text & Markdown Document",
         "role": "Editor",
-        "mimeType": "text/markdown"
+        "mimeType": "text/plain"
       }
     ],
     "macOS": {

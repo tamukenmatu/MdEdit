@@ -81,9 +81,9 @@ fn save_file(path: String, content: String) -> Result<FilePayload, String> {
 #[tauri::command]
 fn open_file_dialog() -> Result<Option<FilePayload>, String> {
     let file = rfd::FileDialog::new()
-        .add_filter("Markdown & Text", &["md", "markdown", "mdown", "mkd", "txt"])
+        .add_filter("Text & Code Files", &["md", "markdown", "mdown", "mkd", "txt", "csv", "tsv", "log", "py", "js", "ts", "json", "yml", "yaml", "sh", "zsh", "bash", "css", "html", "toml", "conf", "ini", "env", "sql", "rs", "rb", "go", "c", "cpp", "h"])
         .add_filter("All Files", &["*"])
-        .set_title("Open Markdown File")
+        .set_title("Open Text or Markdown File")
         .pick_file();
 
     match file {
@@ -131,7 +131,7 @@ fn scan_dir_recursive(dir: &Path) -> Result<Vec<VaultItem>, String> {
                 });
             } else {
                 let ext = path.extension().and_then(|e| e.to_str()).unwrap_or("").to_lowercase();
-                if ["md", "markdown", "txt", "png", "jpg", "jpeg", "gif", "svg", "webp"].contains(&ext.as_str()) {
+                if ["md", "markdown", "mdown", "mkd", "mkdn", "txt", "csv", "tsv", "log", "py", "js", "ts", "json", "yml", "yaml", "sh", "zsh", "bash", "css", "html", "toml", "conf", "ini", "env", "sql", "rs", "rb", "go", "c", "cpp", "h", "png", "jpg", "jpeg", "gif", "svg", "webp"].contains(&ext.as_str()) {
                     items.push(VaultItem {
                         name,
                         path: path.to_string_lossy().to_string(),

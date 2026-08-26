@@ -762,9 +762,8 @@ function renderVaultTree(searchQuery = '') {
       const node = row.closest('.tree-file');
       const path = node.getAttribute('data-path');
       const name = node.getAttribute('data-name');
-      const ext = name.split('.').pop().toLowerCase();
-
-      if (['md', 'markdown', 'txt'].includes(ext)) {
+      const textExtensions = ['md', 'markdown', 'mdown', 'mkd', 'mkdn', 'txt', 'csv', 'tsv', 'log', 'py', 'js', 'ts', 'json', 'yml', 'yaml', 'sh', 'zsh', 'bash', 'css', 'html', 'toml', 'conf', 'ini', 'env', 'sql', 'rs', 'rb', 'go', 'c', 'cpp', 'h'];
+      if (textExtensions.includes(ext)) {
         if (isTauri && tauriCore) {
           try {
             const payload = await tauriCore.invoke('read_file', { path });
@@ -852,6 +851,17 @@ function loadFilePayload(payload, isManual = false) {
   setDirty(false);
   renderMarkdown();
   highlightActiveTreeFile(payload.path);
+
+  // Determine initial mode based on file extension
+  // Non-markdown plain text files (e.g. .txt, .csv, .py, .js, .json, .log, etc.) open directly in Edit mode
+  const ext = (payload.name || '').split('.').pop().toLowerCase();
+  const isMarkdown = ['md', 'markdown', 'mdown', 'mkd', 'mkdn'].includes(ext);
+
+  if (!isMarkdown && ext && !isManual) {
+    setMode('edit');
+  } else if (!isManual && state.mode !== 'edit' && state.mode !== 'split') {
+    setMode('view');
+  }
 }
 
 function showWelcomeManual() {
@@ -1156,6 +1166,19 @@ elements.previewPane.addEventListener('scroll', () => {
   setTimeout(() => { isSyncingEditor = false; }, 50);
 });
 
+// Double Click Preview to Enter Edit Mode (.md files)
+elements.previewPane.addEventListener('dblclick', (e) => {
+  // Prevent if double clicked on a button, link, or badge
+  if (e.target.closest('button') || e.target.closest('a') || e.target.closest('.wikilink') || e.target.closest('.embedded-file-badge') || e.target.closest('.btn-code-copy')) {
+    return;
+  }
+
+  if (state.mode === 'view') {
+    setMode('edit');
+    showToast('編集モードに切り替えました', 'info', 1500);
+  }
+});
+
 // Editor Key Handling (Tab, auto brackets)
 elements.editor.addEventListener('keydown', (e) => {
   if (e.key === 'Tab') {
@@ -1261,7 +1284,7 @@ window.addEventListener('drop', async (e) => {
 
   if (e.dataTransfer && e.dataTransfer.files.length > 0) {
     const file = e.dataTransfer.files[0];
-    if (file.name.match(/\.(md|markdown|mdown|txt)$/i)) {
+    if (file.name.match(/\.(md|markdown|mdown|mkd|mkdn|txt|csv|tsv|log|py|js|ts|json|yml|yaml|sh|zsh|bash|css|html|toml|conf|ini|env|sql|rs|rb|go|c|cpp|h)$/i)) {
       const reader = new FileReader();
       reader.onload = (event) => {
         loadFilePayload({
@@ -1274,7 +1297,7 @@ window.addEventListener('drop', async (e) => {
       };
       reader.readAsText(file);
     } else {
-      showToast('Markdown またはテキストファイルをドロップしてください', 'warning');
+      showToast('テキストファイルをドロップしてください', 'warning');
     }
   }
 });
