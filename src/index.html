@@ -52,21 +52,18 @@
                 <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
                 <circle cx="12" cy="12" r="3"></circle>
               </svg>
-              <span class="seg-btn-label">View</span>
             </button>
             <button id="mode-edit" class="seg-btn" data-mode="edit" title="編集モード (Cmd+E)">
               <svg class="svg-icon" viewBox="0 0 24 24">
                 <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
                 <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
               </svg>
-              <span class="seg-btn-label">Edit</span>
             </button>
             <button id="mode-split" class="seg-btn" data-mode="split" title="2分割プレビュー (Cmd+E)">
               <svg class="svg-icon" viewBox="0 0 24 24">
                 <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
                 <line x1="12" y1="3" x2="12" y2="21"></line>
               </svg>
-              <span class="seg-btn-label">Split</span>
             </button>
           </div>
 
@@ -77,8 +74,7 @@
               <line x1="12" y1="12" x2="12" y2="21"></line>
               <line x1="12" y1="2" x2="12" y2="12"></line>
             </svg>
-            <span id="vault-btn-label" class="obsidian-btn-label">01KEN</span>
-            <span class="vault-switch-indicator" id="vault-switch-indicator">OFF</span>
+            <span id="vault-btn-label">01KEN</span>
           </button>
 
           <button id="btn-save-to-vault" class="icon-btn btn-vault-accent" title="Obsidian 保管庫へ保存・移動">
@@ -92,16 +88,10 @@
         </div>
       </div>
 
-      <!-- Right: Search Bar & Action Buttons -->
+      <!-- Right: Search Bar & More Menu -->
       <div class="header-right">
         <!-- Integrated Header Search Bar -->
         <div class="header-search-container" id="search-container">
-          <button id="btn-search-toggle" class="icon-btn search-toggle-btn" title="検索 (Cmd+F)">
-            <svg class="svg-icon" viewBox="0 0 24 24">
-              <circle cx="11" cy="11" r="8"></circle>
-              <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
-            </svg>
-          </button>
           <div class="header-search-box" id="header-search-box">
             <svg class="svg-icon svg-icon-sm search-icon" viewBox="0 0 24 24">
               <circle cx="11" cy="11" r="8"></circle>
@@ -128,49 +118,15 @@
           </div>
         </div>
 
-        <!-- Action Buttons -->
-        <div class="action-group">
-
-          <button id="btn-new" class="icon-btn" title="新規作成 (Cmd+N)">
+        <div class="dropdown-container">
+          <button id="btn-more" class="icon-btn btn-more-relative" title="その他のアクション">
             <svg class="svg-icon" viewBox="0 0 24 24">
-              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
-              <polyline points="14 2 14 8 20 8"></polyline>
-              <line x1="12" y1="18" x2="12" y2="12"></line>
-              <line x1="9" y1="15" x2="15" y2="15"></line>
+              <circle cx="12" cy="12" r="1"></circle>
+              <circle cx="12" cy="5" r="1"></circle>
+              <circle cx="12" cy="19" r="1"></circle>
             </svg>
+            <span id="update-badge-dot" class="update-badge-dot" style="display: none;" title="新しいバージョンが利用可能です"></span>
           </button>
-
-          <button id="btn-open" class="icon-btn" title="ファイルを開く (Cmd+O)">
-            <svg class="svg-icon" viewBox="0 0 24 24">
-              <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
-            </svg>
-          </button>
-
-          <button id="btn-save" class="icon-btn btn-primary-accent" title="保存 (Cmd+S)">
-            <svg class="svg-icon" viewBox="0 0 24 24">
-              <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path>
-              <polyline points="17 21 17 13 7 13 7 21"></polyline>
-              <polyline points="7 3 7 8 15 8"></polyline>
-            </svg>
-          </button>
-
-          <button id="btn-reload" class="icon-btn" title="再読み込み (Cmd+R)">
-            <svg class="svg-icon" viewBox="0 0 24 24">
-              <polyline points="23 4 23 10 17 10"></polyline>
-              <polyline points="1 20 1 14 7 14"></polyline>
-              <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
-            </svg>
-          </button>
-
-          <div class="dropdown-container">
-            <button id="btn-more" class="icon-btn btn-more-relative" title="その他のアクション">
-              <svg class="svg-icon" viewBox="0 0 24 24">
-                <circle cx="12" cy="12" r="1"></circle>
-                <circle cx="12" cy="5" r="1"></circle>
-                <circle cx="12" cy="19" r="1"></circle>
-              </svg>
-              <span id="update-badge-dot" class="update-badge-dot" style="display: none;" title="新しいバージョンが利用可能です"></span>
-            </button>
             <div id="more-menu" class="dropdown-menu">
               <button id="menu-download-manual" class="menu-item menu-item-highlight">
                 <svg class="svg-icon svg-icon-accent" viewBox="0 0 24 24">

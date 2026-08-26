@@ -2103,11 +2103,11 @@ if (elements.searchInput) {
   });
 }
 
-elements.btnNew.addEventListener('click', newFile);
-elements.btnOpen.addEventListener('click', openFile);
-elements.btnSaveToVault.addEventListener('click', saveToObsidianVault);
-elements.btnSave.addEventListener('click', saveFile);
-elements.btnReload.addEventListener('click', reloadFile);
+if (elements.btnNew) elements.btnNew.addEventListener('click', newFile);
+if (elements.btnOpen) elements.btnOpen.addEventListener('click', openFile);
+if (elements.btnSaveToVault) elements.btnSaveToVault.addEventListener('click', saveToObsidianVault);
+if (elements.btnSave) elements.btnSave.addEventListener('click', saveFile);
+if (elements.btnReload) elements.btnReload.addEventListener('click', reloadFile);
 
 elements.btnMore.addEventListener('click', (e) => {
   e.stopPropagation();
