@@ -203,6 +203,11 @@ renderer.code = function({ text, lang }) {
   `;
 };
 
+// Custom checkbox renderer for interactive task lists
+renderer.checkbox = function({ checked }) {
+  return `<input type="checkbox" class="task-list-checkbox" ${checked ? 'checked' : ''} /> `;
+};
+
 marked.setOptions({
   renderer: renderer,
   gfm: true,
@@ -542,6 +547,13 @@ function renderMarkdown() {
       } else {
         showToast(`添付ファイル: ${fileName}`, 'info');
       }
+    });
+  });
+
+  // Attach checkbox change handlers for interactive task lists in preview
+  elements.preview.querySelectorAll('.task-list-checkbox').forEach((cb, idx) => {
+    cb.addEventListener('change', () => {
+      toggleTaskCheckbox(idx, cb.checked);
     });
   });
 
@@ -1179,7 +1191,33 @@ elements.previewPane.addEventListener('dblclick', (e) => {
   }
 });
 
-// Editor Key Handling (Tab, auto brackets)
+// Interactive Task List Checkbox Toggle
+function toggleTaskCheckbox(taskIndex, isChecked) {
+  const text = elements.editor.value;
+  // Match task list markdown patterns (- [ ], * [ ], + [ ], 1. [ ], etc.)
+  const regex = /^(\s*[-*+]|\s*\d+\.)\s+\[([ xX])\]/gm;
+  let match;
+  let currentIndex = 0;
+
+  while ((match = regex.exec(text)) !== null) {
+    if (currentIndex === taskIndex) {
+      const matchStart = match.index;
+      const bracketOpenPos = text.indexOf('[', matchStart);
+      if (bracketOpenPos !== -1) {
+        const checkPos = bracketOpenPos + 1;
+        const newChar = isChecked ? 'x' : ' ';
+        const newText = text.substring(0, checkPos) + newChar + text.substring(checkPos + 1);
+        elements.editor.value = newText;
+        renderMarkdown();
+        showToast(isChecked ? 'タスクを完了にしました' : 'タスクを未完了に戻しました', 'info', 1200);
+      }
+      break;
+    }
+    currentIndex++;
+  }
+}
+
+// Editor Key Handling (Tab, auto brackets, smart list continuation)
 elements.editor.addEventListener('keydown', (e) => {
   if (e.key === 'Tab') {
     e.preventDefault();
@@ -1188,6 +1226,90 @@ elements.editor.addEventListener('keydown', (e) => {
     elements.editor.value = elements.editor.value.substring(0, start) + '  ' + elements.editor.value.substring(end);
     elements.editor.selectionStart = elements.editor.selectionEnd = start + 2;
     renderMarkdown();
+    return;
+  }
+
+  // 1. Smart List Continuation on Enter
+  if (e.key === 'Enter' && !e.shiftKey && !e.metaKey && !e.ctrlKey && !e.altKey && !e.isComposing) {
+    const val = elements.editor.value;
+    const start = elements.editor.selectionStart;
+    const end = elements.editor.selectionEnd;
+
+    // Only apply when no selection
+    if (start === end) {
+      const lineStart = val.lastIndexOf('\n', start - 1) + 1;
+      const currentLine = val.substring(lineStart, start);
+
+      // Check task list (- [ ] or - [x] or * [ ] etc.)
+      const taskMatch = currentLine.match(/^(\s*[-*+]\s+\[[ xX]\]\s+)(.*)$/);
+      if (taskMatch) {
+        const prefix = taskMatch[1];
+        const content = taskMatch[2];
+
+        e.preventDefault();
+        if (content.trim() === '') {
+          // Empty task line -> clear the list prefix
+          elements.editor.value = val.substring(0, lineStart) + val.substring(start);
+          elements.editor.selectionStart = elements.editor.selectionEnd = lineStart;
+        } else {
+          // Continue task list with unchecked box
+          const indent = prefix.match(/^\s*/)[0];
+          const listBullet = prefix.trim().startsWith('*') ? '*' : '-';
+          const nextPrefix = `\n${indent}${listBullet} [ ] `;
+          elements.editor.value = val.substring(0, start) + nextPrefix + val.substring(end);
+          elements.editor.selectionStart = elements.editor.selectionEnd = start + nextPrefix.length;
+        }
+        renderMarkdown();
+        updateCursorPos();
+        return;
+      }
+
+      // Check unordered list (- , * , + )
+      const unorderedMatch = currentLine.match(/^(\s*[-*+]\s+)(.*)$/);
+      if (unorderedMatch) {
+        const prefix = unorderedMatch[1];
+        const content = unorderedMatch[2];
+
+        e.preventDefault();
+        if (content.trim() === '') {
+          // Empty list item -> clear prefix
+          elements.editor.value = val.substring(0, lineStart) + val.substring(start);
+          elements.editor.selectionStart = elements.editor.selectionEnd = lineStart;
+        } else {
+          // Continue bullet list
+          const nextPrefix = `\n${prefix}`;
+          elements.editor.value = val.substring(0, start) + nextPrefix + val.substring(end);
+          elements.editor.selectionStart = elements.editor.selectionEnd = start + nextPrefix.length;
+        }
+        renderMarkdown();
+        updateCursorPos();
+        return;
+      }
+
+      // Check numbered list (1. , 2. )
+      const orderedMatch = currentLine.match(/^(\s*)(\d+)(\.\s+)(.*)$/);
+      if (orderedMatch) {
+        const indent = orderedMatch[1];
+        const num = parseInt(orderedMatch[2], 10);
+        const sep = orderedMatch[3];
+        const content = orderedMatch[4];
+
+        e.preventDefault();
+        if (content.trim() === '') {
+          // Empty item -> clear
+          elements.editor.value = val.substring(0, lineStart) + val.substring(start);
+          elements.editor.selectionStart = elements.editor.selectionEnd = lineStart;
+        } else {
+          // Continue with next number
+          const nextPrefix = `\n${indent}${num + 1}${sep}`;
+          elements.editor.value = val.substring(0, start) + nextPrefix + val.substring(end);
+          elements.editor.selectionStart = elements.editor.selectionEnd = start + nextPrefix.length;
+        }
+        renderMarkdown();
+        updateCursorPos();
+        return;
+      }
+    }
   }
 });
 
