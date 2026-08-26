@@ -126,6 +126,8 @@ const elements = {
   menuCheckUpdate: document.getElementById('menu-check-update'),
   menuShowFinder: document.getElementById('menu-show-finder'),
   updateBadgeDot: document.getElementById('update-badge-dot'),
+  searchContainer: document.getElementById('search-container'),
+  btnSearchToggle: document.getElementById('btn-search-toggle'),
   btnSearchClear: document.getElementById('btn-search-clear'),
   searchInput: document.getElementById('search-input'),
   searchCount: document.getElementById('search-count'),
@@ -1813,6 +1815,10 @@ function openSearchBar() {
   if (!elements.searchInput) return;
   searchState.isOpen = true;
 
+  if (elements.searchContainer) {
+    elements.searchContainer.classList.add('search-expanded');
+  }
+
   // Pre-fill selected text if available
   let selectedText = '';
   if (state.mode === 'edit' || state.mode === 'split') {
@@ -1839,6 +1845,9 @@ function openSearchBar() {
 
 function closeSearchBar() {
   searchState.isOpen = false;
+  if (elements.searchContainer) {
+    elements.searchContainer.classList.remove('search-expanded');
+  }
   if (elements.searchInput) {
     elements.searchInput.value = '';
     elements.searchInput.blur();
@@ -2059,6 +2068,15 @@ if (elements.btnBrand) {
   elements.btnBrand.addEventListener('click', showWelcomeManual);
 }
 // Search Bar Event Listeners
+if (elements.btnSearchToggle) {
+  elements.btnSearchToggle.addEventListener('click', () => {
+    if (elements.searchContainer && elements.searchContainer.classList.contains('search-expanded')) {
+      closeSearchBar();
+    } else {
+      openSearchBar();
+    }
+  });
+}
 if (elements.btnSearchClear) {
   elements.btnSearchClear.addEventListener('click', () => {
     closeSearchBar();

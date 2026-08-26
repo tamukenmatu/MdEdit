@@ -1730,6 +1730,16 @@ body.mode-split .preview-pane {
   align-items: center;
 }
 
+.header-search-container {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.search-toggle-btn {
+  display: none;
+}
+
 .header-search-box {
   display: flex;
   align-items: center;
@@ -1755,7 +1765,7 @@ body.mode-split .preview-pane {
 }
 
 #search-input {
-  width: 150px;
+  width: 140px;
   background: transparent;
   border: none;
   color: var(--text-primary);
@@ -1766,14 +1776,14 @@ body.mode-split .preview-pane {
 }
 
 #search-input:focus {
-  width: 190px;
+  width: 170px;
 }
 
 .search-count {
   font-size: 11px;
   color: var(--text-secondary);
   font-family: var(--font-mono);
-  min-width: 42px;
+  min-width: 40px;
   text-align: center;
   user-select: none;
 }
@@ -1796,6 +1806,98 @@ body.mode-split .preview-pane {
 .search-nav-btn:hover {
   background: var(--bg-card-hover);
   color: var(--text-primary);
+}
+
+/* ==========================================================================
+   Responsive Header & Overflow Protection
+   ========================================================================== */
+
+/* Step 1: Medium-compact width (<= 1060px) - Shrink search and text */
+@media (max-width: 1060px) {
+  #search-input {
+    width: 100px;
+  }
+  #search-input:focus {
+    width: 130px;
+  }
+  .file-info-container {
+    max-width: 200px;
+  }
+}
+
+/* Step 2: Compact width (<= 940px) - Hide mode text labels, icon only */
+@media (max-width: 940px) {
+  .seg-btn-label {
+    display: none;
+  }
+  .seg-btn {
+    padding: 6px 10px;
+  }
+  .obsidian-btn-label {
+    display: none;
+  }
+  .obsidian-badge-btn {
+    padding: 4px 8px;
+  }
+  .file-info-container {
+    max-width: 160px;
+  }
+}
+
+/* Step 3: Narrow width (<= 820px) - Collapse search bar into popover button */
+@media (max-width: 820px) {
+  .search-toggle-btn {
+    display: inline-flex;
+  }
+
+  .header-search-box {
+    display: none;
+    position: absolute;
+    top: calc(100% + 8px);
+    right: 0;
+    z-index: 100;
+    background: var(--bg-secondary);
+    border: 1px solid var(--accent-primary);
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5);
+    border-radius: var(--radius-md);
+    padding: 4px 8px;
+    height: 38px;
+  }
+
+  .header-search-container.search-expanded .header-search-box {
+    display: flex;
+    animation: fadeIn 0.15s ease;
+  }
+
+  #search-input {
+    width: 160px;
+  }
+  #search-input:focus {
+    width: 180px;
+  }
+
+  .file-info-container {
+    max-width: 130px;
+  }
+}
+
+/* Step 4: Very narrow width (<= 680px) - Minimal header */
+@media (max-width: 680px) {
+  .brand-badge {
+    padding: 6px 8px;
+  }
+  .brand-title {
+    display: none;
+  }
+  .file-info-container {
+    max-width: 100px;
+  }
+  .vault-switch-indicator {
+    display: none;
+  }
+  #btn-new, #btn-reload {
+    display: none; /* Accessible via Cmd+N, Cmd+R or 3-dots */
+  }
 }
 
 /* Document Search Highlights (Moderate elegant brown) */
