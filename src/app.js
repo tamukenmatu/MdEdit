@@ -125,6 +125,7 @@ const elements = {
   menuPrintPdf: document.getElementById('menu-print-pdf'),
   menuCheckUpdate: document.getElementById('menu-check-update'),
   menuShowFinder: document.getElementById('menu-show-finder'),
+  updateBadgeDot: document.getElementById('update-badge-dot'),
   btnSearchClear: document.getElementById('btn-search-clear'),
   searchInput: document.getElementById('search-input'),
   searchCount: document.getElementById('search-count'),
@@ -774,6 +775,7 @@ function renderVaultTree(searchQuery = '') {
       const node = row.closest('.tree-file');
       const path = node.getAttribute('data-path');
       const name = node.getAttribute('data-name');
+      const ext = (name || '').split('.').pop().toLowerCase();
       const textExtensions = ['md', 'markdown', 'mdown', 'mkd', 'mkdn', 'txt', 'csv', 'tsv', 'log', 'py', 'js', 'ts', 'json', 'yml', 'yaml', 'sh', 'zsh', 'bash', 'css', 'html', 'toml', 'conf', 'ini', 'env', 'sql', 'rs', 'rb', 'go', 'c', 'cpp', 'h'];
       if (textExtensions.includes(ext)) {
         if (isTauri && tauriCore) {
@@ -2125,7 +2127,7 @@ if (elements.menuResetPaletteOrder) {
 // Auto Update Checker (Tauri Updater Plugin)
 async function checkForUpdates(manual = true) {
   if (!isTauri) {
-    showToast('アップデート確認はデスクトップアプリ版でのみ利用可能です', 'info');
+    if (manual) showToast('アップデート確認はデスクトップアプリ版でのみ利用可能です', 'info');
     return;
   }
 
@@ -2135,6 +2137,11 @@ async function checkForUpdates(manual = true) {
     const update = await check();
 
     if (update) {
+      // Show pulsing red badge on the 3-dots menu icon
+      if (elements.updateBadgeDot) {
+        elements.updateBadgeDot.style.display = 'block';
+      }
+
       const confirmUpdate = confirm(
         `新しいバージョン (v${update.version}) が利用可能です！\n\n更新内容:\n${update.body || '機能改善とバグ修正'}\n\n今すぐアップデートをダウンロードして再起動しますか？`
       );
@@ -2162,6 +2169,9 @@ async function checkForUpdates(manual = true) {
         await relaunch();
       }
     } else {
+      if (elements.updateBadgeDot) {
+        elements.updateBadgeDot.style.display = 'none';
+      }
       if (manual) {
         showToast('お使いの MdEdit は最新バージョンです', 'success');
       }
@@ -2169,7 +2179,12 @@ async function checkForUpdates(manual = true) {
   } catch (err) {
     console.error('Update check error:', err);
     if (manual) {
-      showToast(`アップデート確認エラー: ${err.message || err}`, 'error');
+      const errStr = String(err && err.message ? err.message : err);
+      if (errStr.includes('Could not fetch') || errStr.includes('404')) {
+        showToast('最新バージョンの配信準備中（GitHub Actions 実行中）です', 'info', 3500);
+      } else {
+        showToast(`アップデート確認: ${errStr}`, 'info', 3000);
+      }
     }
   }
 }
@@ -2241,6 +2256,13 @@ async function init() {
       size: MANUAL_DOC.length,
       last_modified: Date.now()
     }, true);
+  }
+
+  // Check for updates quietly in background (shows badge if update available)
+  if (isTauri) {
+    setTimeout(() => {
+      checkForUpdates(false);
+    }, 3000);
   }
 }
 
