@@ -131,7 +131,7 @@ fn scan_dir_recursive(dir: &Path) -> Result<Vec<VaultItem>, String> {
                 });
             } else {
                 let ext = path.extension().and_then(|e| e.to_str()).unwrap_or("").to_lowercase();
-                if ["md", "markdown", "mdown", "mkd", "mkdn", "txt", "csv", "tsv", "log", "py", "js", "ts", "json", "yml", "yaml", "sh", "zsh", "bash", "css", "html", "toml", "conf", "ini", "env", "sql", "rs", "rb", "go", "c", "cpp", "h", "png", "jpg", "jpeg", "gif", "svg", "webp"].contains(&ext.as_str()) {
+                if ["md", "markdown", "mdown", "mkd", "mkdn", "txt", "csv", "tsv", "log", "py", "js", "ts", "json", "yml", "yaml", "sh", "zsh", "bash", "css", "html", "toml", "conf", "ini", "env", "sql", "rs", "rb", "go", "c", "cpp", "h", "png", "jpg", "jpeg", "gif", "svg", "webp", "pdf"].contains(&ext.as_str()) {
                     items.push(VaultItem {
                         name,
                         path: path.to_string_lossy().to_string(),
@@ -179,6 +179,7 @@ fn read_file_as_data_url(file_path: String) -> Result<String, String> {
         "gif" => "image/gif",
         "svg" => "image/svg+xml",
         "webp" => "image/webp",
+        "pdf" => "application/pdf",
         _ => "application/octet-stream",
     };
     let data = fs::read(&p).map_err(|e| format!("Failed to read file: {}", e))?;

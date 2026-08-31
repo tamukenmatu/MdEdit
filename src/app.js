@@ -1,7 +1,22 @@
 import { marked } from 'marked';
+import TurndownService from 'turndown';
+import { gfm } from 'turndown-plugin-gfm';
 import hljs from 'highlight.js';
 import 'highlight.js/styles/tokyo-night-dark.css';
+import * as pdfjsLib from 'pdfjs-dist';
+import pdfWorker from 'pdfjs-dist/build/pdf.worker.mjs?url';
 import { MANUAL_DOC } from './manual.js';
+
+pdfjsLib.GlobalWorkerOptions.workerSrc = pdfWorker;
+
+// Initialize Turndown (HTML -> Markdown converter) with GFM support (tables, strikethrough, tasklists)
+const turndownService = new TurndownService({
+  headingStyle: 'atx',
+  hr: '---',
+  bulletListMarker: '-',
+  codeBlockStyle: 'fenced'
+});
+turndownService.use(gfm);
 
 // SVG Icons helper (Strict zero-emoji rule)
 const ICONS = {
@@ -14,6 +29,7 @@ const ICONS = {
   folderOpen: `<svg class="svg-icon tree-icon" viewBox="0 0 24 24"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path><polyline points="19 19 22 13 8 13 5 19"></polyline></svg>`,
   file: `<svg class="svg-icon tree-icon" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>`,
   image: `<svg class="svg-icon tree-icon" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><polyline points="21 15 16 10 5 21"></polyline></svg>`,
+  pdf: `<svg class="svg-icon tree-icon" style="color: #f87171;" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="9" y1="13" x2="15" y2="13"></line><line x1="9" y1="17" x2="13" y2="17"></line></svg>`,
   chevron: `<svg class="svg-icon tree-chevron" viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"></polyline></svg>`
 };
 
@@ -41,7 +57,9 @@ const state = {
   activeSidebarTab: defaultTab, // 'toc' | 'vault'
   obsidianMode: obsidianMode,
   vaultPath: localStorage.getItem('mdedit_vault_path') || DEFAULT_VAULT_PATH,
-  vaultTree: [],
+  pdfFilterEnabled: false,
+  undoStack: [], // Max 50 history snapshots
+  redoStack: [],
   vaultFilesMap: new Map(), // lowercased basename without ext -> full path
   vaultImagesMap: new Map(), // filename -> full path
   tocHeadings: []
@@ -87,6 +105,7 @@ const elements = {
   vaultFileCount: document.getElementById('vault-file-count'),
   btnChangeVault: document.getElementById('btn-change-vault'),
   btnRefreshVault: document.getElementById('btn-refresh-vault'),
+  btnFilterPdf: document.getElementById('btn-filter-pdf'),
   vaultSearchInput: document.getElementById('vault-search-input'),
   vaultTree: document.getElementById('vault-tree'),
   btnObsidianVault: document.getElementById('btn-obsidian-vault'),
@@ -577,6 +596,10 @@ function renderMarkdown() {
   const lines = rawContent.length === 0 ? 1 : rawContent.split('\n').length;
   updateGutter(lines);
 
+  // Enable rich live editing in View Mode
+  elements.preview.setAttribute('contenteditable', 'true');
+  elements.preview.setAttribute('spellcheck', 'false');
+
   // Check dirty state
   setDirty(state.currentContent !== state.savedContent);
 
@@ -584,6 +607,188 @@ function renderMarkdown() {
   if (typeof searchState !== 'undefined' && searchState.isOpen && searchState.query) {
     performSearch(searchState.query);
   }
+}
+
+let isSyncingFromRichView = false;
+let undoDebounceTimer = null;
+
+// Push snapshot to Undo Stack (Max 50 history steps)
+function pushUndoSnapshot(text) {
+  if (state.undoStack.length > 0 && state.undoStack[state.undoStack.length - 1] === text) {
+    return; // Don't push identical content
+  }
+  state.undoStack.push(text);
+  if (state.undoStack.length > 50) {
+    state.undoStack.shift(); // Keep max 50 steps
+  }
+  // Clear redo stack on new action
+  state.redoStack = [];
+}
+
+// Perform Undo (Cmd + Z)
+function performUndo() {
+  if (state.undoStack.length === 0) {
+    showToast('これ以上戻せません', 'info', 1000);
+    return;
+  }
+
+  const current = elements.editor.value;
+  const previous = state.undoStack.pop();
+
+  if (previous !== undefined) {
+    state.redoStack.push(current);
+    if (state.redoStack.length > 50) {
+      state.redoStack.shift();
+    }
+    elements.editor.value = previous;
+    state.currentContent = previous;
+    setDirty(previous !== state.savedContent);
+    renderMarkdown();
+    showToast(`取り消し (残り ${state.undoStack.length} 段階)`, 'info', 1000);
+  }
+}
+
+// Perform Redo (Cmd + Shift + Z / Cmd + Y)
+function performRedo() {
+  if (state.redoStack.length === 0) {
+    showToast('これ以上やり直せません', 'info', 1000);
+    return;
+  }
+
+  const current = elements.editor.value;
+  const next = state.redoStack.pop();
+
+  if (next !== undefined) {
+    state.undoStack.push(current);
+    if (state.undoStack.length > 50) {
+      state.undoStack.shift();
+    }
+    elements.editor.value = next;
+    state.currentContent = next;
+    setDirty(next !== state.savedContent);
+    renderMarkdown();
+    showToast(`やり直し (残り ${state.redoStack.length} 段階)`, 'info', 1000);
+  }
+}
+
+// Setup Live Rich View Editing & Smart Cursor Paste
+function setupViewModeSmartPaste() {
+  if (!elements.preview) return;
+
+  // 1. Live Typing / Direct Editing in Rich View
+  elements.preview.addEventListener('input', () => {
+    if (state.mode !== 'view') return;
+    isSyncingFromRichView = true;
+
+    // Snapshot current state for undo before applying new change (debounced)
+    if (!undoDebounceTimer) {
+      pushUndoSnapshot(elements.editor.value);
+    }
+    clearTimeout(undoDebounceTimer);
+    undoDebounceTimer = setTimeout(() => {
+      undoDebounceTimer = null;
+    }, 1200);
+
+    try {
+      // Convert current rich HTML back into standard Markdown
+      const markdown = turndownService.turndown(elements.preview.innerHTML);
+      elements.editor.value = markdown;
+      state.currentContent = markdown;
+      setDirty(true);
+      updateStats(markdown);
+    } catch (err) {
+      console.warn('Rich to Markdown conversion error:', err);
+    } finally {
+      setTimeout(() => { isSyncingFromRichView = false; }, 100);
+    }
+  });
+
+  // 2. Smart Paste at Cursor Position in Rich View
+  window.addEventListener('paste', async (e) => {
+    // If active element is a form input or code editor, allow native paste
+    if (document.activeElement && (document.activeElement.tagName === 'INPUT' || document.activeElement.id === 'markdown-editor')) {
+      return;
+    }
+
+    const clipboardHtml = e.clipboardData ? e.clipboardData.getData('text/html') : '';
+    const clipboardText = e.clipboardData ? e.clipboardData.getData('text/plain') : '';
+    if (!clipboardHtml && !clipboardText) return;
+
+    e.preventDefault();
+
+    let htmlToInsert = '';
+
+    // If text/html exists, clean up unwanted external inline styles (white background, black text, custom font-family, etc.)
+    if (clipboardHtml && (clipboardHtml.includes('<table') || clipboardHtml.includes('<h') || clipboardHtml.includes('<ul') || clipboardHtml.includes('<ol') || clipboardHtml.includes('<pre') || clipboardHtml.includes('<code') || clipboardHtml.includes('<p') || clipboardHtml.includes('<div') || clipboardHtml.includes('<span') || clipboardHtml.includes('<strong>') || clipboardHtml.includes('<em>'))) {
+      
+      // Parse HTML in DOM to clean inline styles and external classes
+      const parser = new DOMParser();
+      const doc = parser.parseFromString(clipboardHtml, 'text/html');
+      
+      // Remove all inline 'style', 'class', 'id', 'data-*' attributes to adopt MdEdit's Tokyo-Night theme
+      doc.body.querySelectorAll('*').forEach(el => {
+        el.removeAttribute('style');
+        el.removeAttribute('class');
+        el.removeAttribute('id');
+        el.removeAttribute('bgcolor');
+        el.removeAttribute('color');
+      });
+
+      // Convert cleaned HTML to pure standard Markdown first to ensure 100% semantic integrity
+      const rawMarkdown = turndownService.turndown(doc.body.innerHTML);
+      // Re-parse with marked for consistent MdEdit typography & syntax highlighting
+      htmlToInsert = marked.parse(rawMarkdown);
+    } else {
+      // Plain text or Gemini raw text output
+      const isMarkdownText = /^(#{1,6}\s|```|\|.+\||\*+\s|-\s|\d+\.\s|>\s)/m.test(clipboardText);
+      if (isMarkdownText || clipboardText.includes('\n')) {
+        // Render markdown snippet to rich HTML
+        htmlToInsert = marked.parse(clipboardText);
+      } else {
+        // Single plain text (escape HTML and preserve linebreaks)
+        htmlToInsert = clipboardText.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\n/g, '<br>');
+      }
+    }
+
+    // Insert HTML at current selection/caret position
+    const selection = window.getSelection();
+    if (selection && selection.rangeCount > 0 && elements.preview.contains(selection.anchorNode)) {
+      const range = selection.getRangeAt(0);
+      range.deleteContents();
+
+      const tempDiv = document.createElement('div');
+      tempDiv.innerHTML = htmlToInsert;
+      const frag = document.createDocumentFragment();
+      let node, lastNode;
+      while ((node = tempDiv.firstChild)) {
+        lastNode = frag.appendChild(node);
+      }
+      range.insertNode(frag);
+
+      // Move caret after inserted content
+      if (lastNode) {
+        range.setStartAfter(lastNode);
+        range.collapse(true);
+        selection.removeAllRanges();
+        selection.addRange(range);
+      }
+    } else {
+      // If no active caret in preview, append to bottom
+      elements.preview.insertAdjacentHTML('beforeend', htmlToInsert);
+    }
+
+    // Sync back to editor markdown
+    try {
+      const markdown = turndownService.turndown(elements.preview.innerHTML);
+      elements.editor.value = markdown;
+      state.currentContent = markdown;
+      setDirty(true);
+      updateStats(markdown);
+      showToast('カーソル位置にスマート挿入しました', 'success', 1500);
+    } catch (err) {
+      console.warn('Sync error after paste:', err);
+    }
+  });
 }
 
 // Dirty status indicator
@@ -687,6 +892,14 @@ function buildVaultIndex(nodes) {
 }
 
 function renderVaultNode(item, searchQuery = '') {
+  const ext = item.name.split('.').pop().toLowerCase();
+  const isPdf = ext === 'pdf';
+
+  // PDF filter check
+  if (state.pdfFilterEnabled && !item.is_dir && !isPdf) {
+    return { html: '', matched: false };
+  }
+
   const isMatch = searchQuery === '' || item.name.toLowerCase().includes(searchQuery.toLowerCase());
 
   if (item.is_dir) {
@@ -703,11 +916,11 @@ function renderVaultNode(item, searchQuery = '') {
       }
     }
 
-    if (searchQuery !== '' && !isMatch && !hasMatchingChild) {
+    if ((searchQuery !== '' || state.pdfFilterEnabled) && !hasMatchingChild && (!isMatch || state.pdfFilterEnabled)) {
       return { html: '', matched: false };
     }
 
-    const isOpen = searchQuery !== '' && hasMatchingChild;
+    const isOpen = (searchQuery !== '' || state.pdfFilterEnabled) && hasMatchingChild;
 
     const html = `
       <div class="tree-node tree-folder" data-path="${item.path}">
@@ -728,9 +941,11 @@ function renderVaultNode(item, searchQuery = '') {
       return { html: '', matched: false };
     }
 
-    const ext = item.name.split('.').pop().toLowerCase();
     const isImage = ['png', 'jpg', 'jpeg', 'gif', 'svg', 'webp'].includes(ext);
-    const iconSvg = isImage ? ICONS.image : ICONS.file;
+    let iconSvg = ICONS.file;
+    if (isImage) iconSvg = ICONS.image;
+    if (isPdf) iconSvg = ICONS.pdf;
+
     const isActive = state.filePath === item.path;
 
     const html = `
@@ -760,7 +975,7 @@ function renderVaultTree(searchQuery = '') {
   }
 
   if (!fullHtml) {
-    elements.vaultTree.innerHTML = '<div class="vault-loading">一致するファイルが見つかりません</div>';
+    elements.vaultTree.innerHTML = `<div class="vault-loading">${state.pdfFilterEnabled ? 'PDF ファイルが見つかりません' : '一致するファイルが見つかりません'}</div>`;
     return;
   }
 
@@ -786,6 +1001,14 @@ function renderVaultTree(searchQuery = '') {
       const path = node.getAttribute('data-path');
       const name = node.getAttribute('data-name');
       const ext = (name || '').split('.').pop().toLowerCase();
+
+      if (ext === 'pdf') {
+        // Load native PDF viewer
+        await loadPdfViewer(path, name);
+        highlightActiveTreeFile(path);
+        return;
+      }
+
       const textExtensions = ['md', 'markdown', 'mdown', 'mkd', 'mkdn', 'txt', 'csv', 'tsv', 'log', 'py', 'js', 'ts', 'json', 'yml', 'yaml', 'sh', 'zsh', 'bash', 'css', 'html', 'toml', 'conf', 'ini', 'env', 'sql', 'rs', 'rb', 'go', 'c', 'cpp', 'h'];
       if (textExtensions.includes(ext)) {
         if (isTauri && tauriCore) {
@@ -802,6 +1025,74 @@ function renderVaultTree(searchQuery = '') {
       }
     });
   });
+}
+
+// Native PDF Canvas Viewer with Zero HUD Icons & Pure Dark Theme
+let currentPdfDoc = null;
+
+async function renderPdfDocument() {
+  if (!currentPdfDoc) return;
+  const container = document.getElementById('pdf-canvas-container');
+  if (!container) return;
+
+  container.innerHTML = '';
+  const scale = (state.pdfZoomLevel || 1.1) * (window.devicePixelRatio || 1);
+
+  for (let pageNum = 1; pageNum <= currentPdfDoc.numPages; pageNum++) {
+    const page = await currentPdfDoc.getPage(pageNum);
+    const viewport = page.getViewport({ scale });
+
+    const pageWrapper = document.createElement('div');
+    pageWrapper.className = 'pdf-page-wrapper';
+    pageWrapper.style.cssText = `margin: 16px auto; display: flex; justify-content: center; box-shadow: 0 8px 30px rgba(0,0,0,0.5); border-radius: 4px; overflow: hidden; background: #ffffff;`;
+
+    const canvas = document.createElement('canvas');
+    canvas.width = viewport.width;
+    canvas.height = viewport.height;
+    canvas.style.width = `${viewport.width / (window.devicePixelRatio || 1)}px`;
+    canvas.style.height = `${viewport.height / (window.devicePixelRatio || 1)}px`;
+    canvas.style.display = 'block';
+
+    const ctx = canvas.getContext('2d');
+    await page.render({ canvasContext: ctx, viewport }).promise;
+
+    pageWrapper.appendChild(canvas);
+    container.appendChild(pageWrapper);
+  }
+}
+
+async function loadPdfViewer(path, name) {
+  if (!isTauri || !tauriCore) return;
+
+  try {
+    const dataUrl = await tauriCore.invoke('read_file_as_data_url', { filePath: path });
+    state.filePath = path;
+    state.fileName = name;
+    state.isPdf = true;
+    state.pdfZoomLevel = 1.15;
+    elements.fileName.textContent = name;
+    elements.filePath.textContent = path;
+    document.title = `${name} - MdEdit`;
+
+    setMode('view');
+    elements.body.classList.add('is-pdf-view');
+    elements.preview.removeAttribute('contenteditable');
+
+    elements.preview.innerHTML = `
+      <div id="pdf-canvas-container" style="width: 100%; min-height: 100%; padding: 24px 0; background: #0b1120; display: flex; flex-direction: column; align-items: center; overflow-y: auto;">
+        <div style="color: var(--text-muted); font-size: 13px; margin: 40px auto;">PDF を読み込み中...</div>
+      </div>
+    `;
+
+    const loadingTask = pdfjsLib.getDocument({ url: dataUrl });
+    currentPdfDoc = await loadingTask.promise;
+    await renderPdfDocument();
+
+    showToast(`PDF を開きました (${currentPdfDoc.numPages} ページ): ${name}`, 'success', 1500);
+  } catch (err) {
+    showToast(`PDF の読み込みに失敗しました: ${err}`, 'error');
+    console.error('PDF load error:', err);
+  }
 }
 
 function highlightActiveTreeFile(path) {
@@ -900,6 +1191,8 @@ async function changeVaultFolder() {
 function loadFilePayload(payload, isManual = false) {
   state.filePath = payload.path;
   state.fileName = payload.name;
+  state.isPdf = false;
+  elements.body.classList.remove('is-pdf-view');
   state.savedContent = payload.content;
   state.currentContent = payload.content;
   state.isManual = isManual || payload.name === 'MdEdit_Manual.md';
@@ -919,20 +1212,8 @@ function loadFilePayload(payload, isManual = false) {
   renderMarkdown();
   highlightActiveTreeFile(payload.path);
 
-  // Determine initial mode based on file extension
-  // Markdown / Rich document files always open in View mode (regardless of previous state)
-  // Plain text / Code files open in Edit mode
-  const ext = (payload.name || '').split('.').pop().toLowerCase();
-  const renderableExtensions = ['md', 'markdown', 'mdown', 'mkd', 'mkdn', 'html', 'htm', 'svg'];
-  const isRenderable = renderableExtensions.includes(ext);
-
-  if (isManual || isRenderable || !ext) {
-    // Markdown or HTML documents -> Always default to View mode
-    setMode('view');
-  } else {
-    // Non-renderable source code or plain text files (.txt, .py, .js, .json, .csv, .log, etc.) -> Edit mode
-    setMode('edit');
-  }
+  // Always open in View mode by default (Unified view-first design)
+  setMode('view');
 }
 
 function showWelcomeManual() {
@@ -1237,18 +1518,7 @@ elements.previewPane.addEventListener('scroll', () => {
   setTimeout(() => { isSyncingEditor = false; }, 50);
 });
 
-// Double Click Preview to Enter Edit Mode (.md files)
-elements.previewPane.addEventListener('dblclick', (e) => {
-  // Prevent if double clicked on a button, link, or badge
-  if (e.target.closest('button') || e.target.closest('a') || e.target.closest('.wikilink') || e.target.closest('.embedded-file-badge') || e.target.closest('.btn-code-copy')) {
-    return;
-  }
 
-  if (state.mode === 'view') {
-    setMode('edit');
-    showToast('編集モードに切り替えました', 'info', 1500);
-  }
-});
 
 // Interactive Task List Checkbox Toggle
 function toggleTaskCheckbox(taskIndex, isChecked) {
@@ -1392,8 +1662,14 @@ elements.editor.addEventListener('input', () => {
 // Keyboard Shortcuts (macOS Command & Windows Ctrl)
 window.addEventListener('keydown', (e) => {
   const isCmdOrCtrl = e.metaKey || e.ctrlKey;
-  
-  if (isCmdOrCtrl && !e.shiftKey && e.key.toLowerCase() === 'f') {
+
+  if (isCmdOrCtrl && !e.shiftKey && e.key.toLowerCase() === 'z') {
+    e.preventDefault();
+    performUndo();
+  } else if ((isCmdOrCtrl && e.shiftKey && e.key.toLowerCase() === 'z') || (isCmdOrCtrl && e.key.toLowerCase() === 'y')) {
+    e.preventDefault();
+    performRedo();
+  } else if (isCmdOrCtrl && !e.shiftKey && e.key.toLowerCase() === 'f') {
     e.preventDefault();
     openSearchBar();
   } else if (isCmdOrCtrl && !e.shiftKey && e.key.toLowerCase() === 'g') {
@@ -1637,8 +1913,17 @@ function applyMarkdownTool(tool) {
   updateCursorPos();
 }
 
-// Zoom Controls (Scales content text only while keeping UI fixed)
-function setZoom(level, showFeedback = true) {
+// Zoom Controls (Scales content text only while keeping UI fixed, or scales PDF)
+async function setZoom(level, showFeedback = true) {
+  if (state.isPdf) {
+    state.pdfZoomLevel = Math.min(3.0, Math.max(0.5, Math.round(level * 10) / 10));
+    await renderPdfDocument();
+    if (showFeedback) {
+      showToast(`PDF 拡大率: ${Math.round(state.pdfZoomLevel * 100)}%`, 'info', 1000);
+    }
+    return;
+  }
+
   state.zoomLevel = Math.min(2.0, Math.max(0.7, Math.round(level * 10) / 10));
   document.body.style.zoom = '';
   document.documentElement.style.setProperty('--content-zoom', state.zoomLevel.toString());
@@ -1652,15 +1937,27 @@ function setZoom(level, showFeedback = true) {
 }
 
 function zoomIn() {
-  setZoom(state.zoomLevel + 0.1);
+  if (state.isPdf) {
+    setZoom((state.pdfZoomLevel || 1.0) + 0.15);
+  } else {
+    setZoom(state.zoomLevel + 0.1);
+  }
 }
 
 function zoomOut() {
-  setZoom(state.zoomLevel - 0.1);
+  if (state.isPdf) {
+    setZoom((state.pdfZoomLevel || 1.0) - 0.15);
+  } else {
+    setZoom(state.zoomLevel - 0.1);
+  }
 }
 
 function zoomReset() {
-  setZoom(1.0);
+  if (state.isPdf) {
+    setZoom(1.0);
+  } else {
+    setZoom(1.0);
+  }
 }
 
 // Palette Pinning (Always Expanded State)
@@ -2109,6 +2406,14 @@ elements.tabToc.addEventListener('click', () => switchSidebarTab('toc'));
 elements.btnObsidianVault.addEventListener('click', toggleObsidianMode);
 elements.btnChangeVault.addEventListener('click', changeVaultFolder);
 elements.btnRefreshVault.addEventListener('click', () => loadVaultTree());
+if (elements.btnFilterPdf) {
+  elements.btnFilterPdf.addEventListener('click', () => {
+    state.pdfFilterEnabled = !state.pdfFilterEnabled;
+    elements.btnFilterPdf.classList.toggle('active', state.pdfFilterEnabled);
+    renderVaultTree(elements.vaultSearchInput.value.trim());
+    showToast(state.pdfFilterEnabled ? 'PDF フィルタ: ON' : 'PDF フィルタ: OFF (全ファイル表示)', 'info', 1500);
+  });
+}
 elements.vaultSearchInput.addEventListener('input', (e) => {
   renderVaultTree(e.target.value.trim());
 });
@@ -2287,6 +2592,7 @@ async function init() {
   elements.btnToggleSidebar.classList.toggle('active', state.sidebarOpen);
   switchSidebarTab(state.activeSidebarTab);
   syncObsidianModeUI();
+  setupViewModeSmartPaste();
 
   // Initialize Vault Tree in background
   loadVaultTree();
