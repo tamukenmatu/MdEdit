@@ -509,7 +509,15 @@ function renderMarkdown() {
 
   elements.preview.innerHTML = frontmatterHtml + renderedHtml;
   
-  // Attach copy button handlers
+  // Wrap tables for responsive containment
+  elements.preview.querySelectorAll('table').forEach(tbl => {
+    if (!tbl.parentElement.classList.contains('table-container')) {
+      const wrapper = document.createElement('div');
+      wrapper.className = 'table-container';
+      tbl.parentNode.insertBefore(wrapper, tbl);
+      wrapper.appendChild(tbl);
+    }
+  });
   elements.preview.querySelectorAll('.btn-code-copy').forEach(btn => {
     btn.addEventListener('click', async () => {
       const code = decodeURIComponent(btn.getAttribute('data-code'));
@@ -835,12 +843,39 @@ async function loadVaultTree() {
       state.vaultTree = tree;
       buildVaultIndex(tree);
       renderVaultTree(elements.vaultSearchInput.value.trim());
+
+      // Dynamically load custom vault styling (.mdedit/style.css) if present
+      await loadCustomVaultStyle();
     } catch (e) {
       elements.vaultTree.innerHTML = `<div class="vault-loading">保管庫の読み込みに失敗しました</div>`;
       console.warn('Vault load error:', e);
     }
   } else {
     elements.vaultTree.innerHTML = `<div class="vault-loading">Web モード（Tauri 未接続）</div>`;
+  }
+}
+
+// Load custom CSS from Vault directory (.mdedit/style.css) without requiring app rebuild
+async function loadCustomVaultStyle() {
+  if (!state.vaultPath || !isTauri || !tauriCore) return;
+
+  const customCssPath = `${state.vaultPath.replace(/\/+$/, '')}/.mdedit/style.css`;
+  try {
+    const fileRes = await tauriCore.invoke('read_file', { path: customCssPath });
+    if (fileRes && fileRes.content) {
+      let styleTag = document.getElementById('dynamic-vault-style');
+      if (!styleTag) {
+        styleTag = document.createElement('style');
+        styleTag.id = 'dynamic-vault-style';
+        document.head.appendChild(styleTag);
+      }
+      styleTag.textContent = fileRes.content;
+      console.log('Custom Vault Style applied from:', customCssPath);
+    }
+  } catch (e) {
+    // Custom style not found or not created yet, default built-in CSS is used
+    const styleTag = document.getElementById('dynamic-vault-style');
+    if (styleTag) styleTag.textContent = '';
   }
 }
 
@@ -885,14 +920,18 @@ function loadFilePayload(payload, isManual = false) {
   highlightActiveTreeFile(payload.path);
 
   // Determine initial mode based on file extension
-  // Non-markdown plain text files (e.g. .txt, .csv, .py, .js, .json, .log, etc.) open directly in Edit mode
+  // Markdown / Rich document files always open in View mode (regardless of previous state)
+  // Plain text / Code files open in Edit mode
   const ext = (payload.name || '').split('.').pop().toLowerCase();
-  const isMarkdown = ['md', 'markdown', 'mdown', 'mkd', 'mkdn'].includes(ext);
+  const renderableExtensions = ['md', 'markdown', 'mdown', 'mkd', 'mkdn', 'html', 'htm', 'svg'];
+  const isRenderable = renderableExtensions.includes(ext);
 
-  if (!isMarkdown && ext && !isManual) {
-    setMode('edit');
-  } else if (!isManual && state.mode !== 'edit' && state.mode !== 'split') {
+  if (isManual || isRenderable || !ext) {
+    // Markdown or HTML documents -> Always default to View mode
     setMode('view');
+  } else {
+    // Non-renderable source code or plain text files (.txt, .py, .js, .json, .csv, .log, etc.) -> Edit mode
+    setMode('edit');
   }
 }
 

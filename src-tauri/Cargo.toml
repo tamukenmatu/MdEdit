@@ -25,6 +25,7 @@ tauri = { version = "2.11.3", features = [] }
 tauri-plugin-log = "2"
 tauri-plugin-updater = "2"
 tauri-plugin-process = "2"
+tauri-plugin-window-state = "2"
 rfd = "0.17.2"
 url = "2.5.8"
 base64 = "0.23.1"

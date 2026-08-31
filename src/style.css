@@ -1289,7 +1289,7 @@ body.mode-split .preview-pane {
 .preview-pane {
   height: 100%;
   overflow-y: auto;
-  overflow-x: hidden;
+  overflow-x: auto;
   padding: 32px 48px;
   background: var(--bg-primary);
   display: flex;
@@ -1299,6 +1299,7 @@ body.mode-split .preview-pane {
 .markdown-body {
   width: 100%;
   max-width: calc(880px * var(--content-zoom));
+  min-width: 0;
   color: var(--text-primary);
   font-family: var(--font-sans);
   font-size: calc(15px * var(--content-zoom));
@@ -1570,16 +1571,17 @@ body.mode-split .preview-pane {
   color: #e2e8f0;
 }
 
-/* Tables */
+/* Tables (Responsive & Contained) */
 .markdown-body table {
-  width: 100%;
+  width: 100% !important;
+  max-width: 100% !important;
   margin: 1.2em 0;
   border-collapse: collapse;
   border: 1px solid var(--border-color);
   border-radius: var(--radius-sm);
   background: var(--bg-card);
   font-size: 13px;
-  overflow: hidden;
+  table-layout: fixed !important;
 }
 
 .markdown-body thead {
@@ -1590,16 +1592,28 @@ body.mode-split .preview-pane {
 .markdown-body td {
   padding: 8px 14px;
   text-align: left;
-  vertical-align: middle;
+  vertical-align: top;
   border: 1px solid var(--border-color);
   line-height: 1.5;
+  word-break: break-word !important;
+  overflow-wrap: anywhere !important;
+}
+
+.markdown-body td code,
+.markdown-body td strong,
+.markdown-body td kbd,
+.markdown-body td a {
+  word-break: break-all !important;
+  overflow-wrap: anywhere !important;
+  white-space: normal !important;
+  display: inline-block;
+  max-width: 100%;
 }
 
 .markdown-body th {
   font-weight: 600;
   color: #f8fafc;
   border-bottom: 2px solid rgba(56, 189, 248, 0.4);
-  white-space: nowrap;
 }
 
 .markdown-body td {
@@ -1607,25 +1621,8 @@ body.mode-split .preview-pane {
 }
 
 .markdown-body td:first-child {
-  white-space: nowrap !important;
   font-weight: 600;
   color: #7dd3fc;
-}
-
-.markdown-body td:nth-child(2),
-.markdown-body td:nth-child(3) {
-  white-space: nowrap !important;
-}
-
-.markdown-body td code,
-.markdown-body td strong,
-.markdown-body td kbd {
-  white-space: nowrap !important;
-}
-
-.markdown-body th:last-child,
-.markdown-body td:last-child {
-  width: 100%;
 }
 
 .markdown-body tr:nth-child(even) {
