@@ -503,6 +503,43 @@ body {
   margin: 4px 0;
 }
 
+.table-context-menu {
+  position: fixed;
+  z-index: 1000;
+  width: auto;
+  min-width: 130px;
+  max-width: 160px;
+  padding: 4px;
+  border-radius: var(--radius-sm);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.08);
+}
+
+.table-context-menu .menu-item {
+  padding: 5px 8px;
+  font-size: 12px;
+  gap: 8px;
+  white-space: nowrap;
+}
+
+.menu-shortcut {
+  margin-left: auto;
+  font-size: 10px;
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  background: rgba(255, 255, 255, 0.05);
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+.menu-item-danger {
+  color: #f87171 !important;
+}
+
+.menu-item-danger:hover {
+  background: rgba(239, 68, 68, 0.15) !important;
+  color: #fca5a5 !important;
+}
+
 /* Main Area Layout */
 .app-main {
   display: flex;
@@ -1529,7 +1566,8 @@ body.is-pdf-view .markdown-body {
   background: rgba(30, 41, 59, 0.8);
   border: 1px solid rgba(51, 65, 85, 0.6);
   border-radius: 4px;
-  color: #7dd3fc;
+  color: #ffffff;
+  text-decoration: none;
 }
 
 .markdown-body pre {

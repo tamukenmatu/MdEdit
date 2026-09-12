@@ -14,4 +14,8 @@ if [ -d "$APP_SRC" ]; then
   rm -rf /Applications/MdEdit.app
   cp -R "$APP_SRC" /Applications/
   echo "SUCCESS: /Applications/MdEdit.app updated!"
+
+  echo "Deploying to MacBook Air (air:/Applications/MdEdit.app)..."
+  rsync -avz --delete "$APP_SRC" air:/Applications/
+  echo "SUCCESS: air:/Applications/MdEdit.app updated!"
 fi

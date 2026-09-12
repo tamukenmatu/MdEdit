@@ -48,7 +48,7 @@
 
 | プラットフォーム | 実行スクリプト | 動作内容 | 成果物の配置先 |
 | :--- | :--- | :--- | :--- |
-| **macOS (`k-m1`)** | `./scripts/build-mac.sh` | ローカルで Vite + Cargo ビルドを実行 | `/Applications/MdEdit.app` |
+| **macOS (`k-m1` & `air`)** | `./scripts/build-mac.sh` | ローカルで Vite + Cargo ビルドを実行後、ローカルおよび SSH 経由で MacBook Air (`air`) に配布 | `/Applications/MdEdit.app`<br>`air:/Applications/MdEdit.app` |
 | **Linux (`k-gmk`)** | `./scripts/build-linux.sh` | rsync で同期後、SSH 経由で Wayland / GTK3 ネイティブビルド | `k-gmk:/home/ken/Apps/mdedit` |
 | **Windows (`msi`)** | `./scripts/build-windows.sh` | rsync で同期後、SSH 経由で MSVC ポータブルビルド | `msi:C:\Users\makke\Documents\Myapplication\MdEdit.exe` |
 

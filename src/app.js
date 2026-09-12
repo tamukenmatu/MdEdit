@@ -791,6 +791,272 @@ function setupViewModeSmartPaste() {
   });
 }
 
+// Setup View Mode Table Interactions (Row Insert/Delete via Cmd+Enter, Tab, ContextMenu)
+function setupViewModeTableInteractions() {
+  if (!elements.preview) return;
+
+  // 1. Context Menu for Table Cells (Insert Row Above/Below, Delete Row)
+  let tableContextMenu = document.getElementById('table-context-menu');
+  if (!tableContextMenu) {
+    tableContextMenu = document.createElement('div');
+    tableContextMenu.id = 'table-context-menu';
+    tableContextMenu.className = 'dropdown-menu table-context-menu';
+    tableContextMenu.innerHTML = `
+      <button class="menu-item" id="menu-table-insert-above">
+        <svg class="svg-icon svg-icon-sm" viewBox="0 0 24 24"><polyline points="18 15 12 9 6 15"></polyline></svg>
+        <span>上に行を挿入</span>
+      </button>
+      <button class="menu-item" id="menu-table-insert-below">
+        <svg class="svg-icon svg-icon-sm" viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"></polyline></svg>
+        <span>下に行を挿入</span>
+      </button>
+      <div class="menu-divider" id="menu-table-delete-divider"></div>
+      <button class="menu-item menu-item-danger" id="menu-table-delete-row">
+        <svg class="svg-icon svg-icon-sm" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+        <span>行を削除</span>
+      </button>
+    `;
+    document.body.appendChild(tableContextMenu);
+  }
+
+  let activeTableTarget = null; // { table, row, cell }
+
+  function hideTableContextMenu() {
+    if (tableContextMenu) {
+      tableContextMenu.classList.remove('show');
+      tableContextMenu.style.display = 'none';
+    }
+  }
+
+  // Close context menu immediately on any mousedown outside
+  window.addEventListener('mousedown', (e) => {
+    if (tableContextMenu && tableContextMenu.classList.contains('show')) {
+      if (!tableContextMenu.contains(e.target)) {
+        hideTableContextMenu();
+      }
+    }
+  }, true);
+
+  window.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+      hideTableContextMenu();
+    }
+  });
+
+  // Helper to focus the first cell in a given row
+  function focusCell(row, cellIndex = 0) {
+    if (!row) return;
+    const targetCell = row.cells[cellIndex] || row.cells[0];
+    if (targetCell) {
+      targetCell.focus();
+      const selection = window.getSelection();
+      const range = document.createRange();
+      range.selectNodeContents(targetCell);
+      range.collapse(false);
+      selection.removeAllRanges();
+      selection.addRange(range);
+    }
+  }
+
+  // Insert a new row above or below
+  function insertTableRow(targetRow, position = 'below') {
+    if (!targetRow) return;
+    const table = targetRow.closest('table');
+    if (!table) return;
+
+    // Determine number of columns from the first row of table (or header)
+    const headerRow = table.querySelector('tr');
+    const colCount = headerRow ? headerRow.cells.length : targetRow.cells.length;
+
+    // Find or create tbody
+    let tbody = table.querySelector('tbody');
+    if (!tbody) {
+      tbody = document.createElement('tbody');
+      table.appendChild(tbody);
+    }
+
+    const newRow = document.createElement('tr');
+    for (let i = 0; i < colCount; i++) {
+      const td = document.createElement('td');
+      newRow.appendChild(td);
+    }
+
+    if (position === 'above') {
+      if (targetRow.parentElement && targetRow.parentElement.tagName.toLowerCase() === 'thead') {
+        // If clicking on header row, insert at the beginning of tbody
+        if (tbody.firstChild) {
+          tbody.insertBefore(newRow, tbody.firstChild);
+        } else {
+          tbody.appendChild(newRow);
+        }
+      } else {
+        targetRow.parentElement.insertBefore(newRow, targetRow);
+      }
+    } else {
+      if (targetRow.parentElement && targetRow.parentElement.tagName.toLowerCase() === 'thead') {
+        // If clicking on header, insert as first row in tbody
+        if (tbody.firstChild) {
+          tbody.insertBefore(newRow, tbody.firstChild);
+        } else {
+          tbody.appendChild(newRow);
+        }
+      } else {
+        if (targetRow.nextSibling) {
+          targetRow.parentElement.insertBefore(newRow, targetRow.nextSibling);
+        } else {
+          targetRow.parentElement.appendChild(newRow);
+        }
+      }
+    }
+
+    // Trigger input event to sync with editor & turndown
+    elements.preview.dispatchEvent(new Event('input', { bubbles: true }));
+
+    // Focus first cell of new row
+    setTimeout(() => {
+      focusCell(newRow, 0);
+    }, 10);
+  }
+
+  // Delete current row
+  function deleteTableRow(targetRow) {
+    if (!targetRow) return;
+    const table = targetRow.closest('table');
+    if (!table) return;
+
+    // Never delete the header row
+    if (targetRow.parentElement && targetRow.parentElement.tagName.toLowerCase() === 'thead') {
+      showToast('ヘッダー行は削除できません', 'info', 1500);
+      return;
+    }
+
+    const prevRow = targetRow.previousElementSibling || targetRow.parentElement.previousElementSibling?.querySelector('tr:last-child');
+    const nextRow = targetRow.nextElementSibling;
+
+    targetRow.remove();
+
+    // Trigger input event to sync
+    elements.preview.dispatchEvent(new Event('input', { bubbles: true }));
+
+    if (nextRow) {
+      focusCell(nextRow, 0);
+    } else if (prevRow) {
+      focusCell(prevRow, 0);
+    }
+  }
+
+  // Context Menu button handlers
+  document.getElementById('menu-table-insert-above')?.addEventListener('click', () => {
+    if (activeTableTarget && activeTableTarget.row) {
+      insertTableRow(activeTableTarget.row, 'above');
+    }
+    hideTableContextMenu();
+  });
+
+  document.getElementById('menu-table-insert-below')?.addEventListener('click', () => {
+    if (activeTableTarget && activeTableTarget.row) {
+      insertTableRow(activeTableTarget.row, 'below');
+    }
+    hideTableContextMenu();
+  });
+
+  document.getElementById('menu-table-delete-row')?.addEventListener('click', () => {
+    if (activeTableTarget && activeTableTarget.row) {
+      deleteTableRow(activeTableTarget.row);
+    }
+    hideTableContextMenu();
+  });
+
+  // Right-click on table cells
+  elements.preview.addEventListener('contextmenu', (e) => {
+    if (state.mode !== 'view') return;
+
+    const cell = e.target.closest('td, th');
+    if (!cell || !elements.preview.contains(cell)) return;
+
+    const row = cell.closest('tr');
+    const table = cell.closest('table');
+    if (!row || !table) return;
+
+    e.preventDefault();
+    activeTableTarget = { table, row, cell };
+
+    // If target is header, disable/hide delete row
+    const isHeader = row.parentElement && row.parentElement.tagName.toLowerCase() === 'thead';
+    const deleteBtn = document.getElementById('menu-table-delete-row');
+    const deleteDivider = document.getElementById('menu-table-delete-divider');
+    if (deleteBtn && deleteDivider) {
+      deleteBtn.style.display = isHeader ? 'none' : 'flex';
+      deleteDivider.style.display = isHeader ? 'none' : 'block';
+    }
+
+    // Position context menu
+    tableContextMenu.style.display = 'flex';
+    const menuWidth = 200;
+    const menuHeight = isHeader ? 80 : 120;
+    let x = e.clientX;
+    let y = e.clientY;
+
+    if (x + menuWidth > window.innerWidth) {
+      x = window.innerWidth - menuWidth - 10;
+    }
+    if (y + menuHeight > window.innerHeight) {
+      y = window.innerHeight - menuHeight - 10;
+    }
+
+    tableContextMenu.style.left = `${x}px`;
+    tableContextMenu.style.top = `${y}px`;
+    tableContextMenu.classList.add('show');
+  });
+
+  // Keyboard Shortcuts in View mode for table rows
+  elements.preview.addEventListener('keydown', (e) => {
+    if (state.mode !== 'view') return;
+
+    const selection = window.getSelection();
+    if (!selection || !selection.anchorNode) return;
+
+    const anchorElement = selection.anchorNode.nodeType === Node.ELEMENT_NODE
+      ? selection.anchorNode
+      : selection.anchorNode.parentElement;
+
+    const cell = anchorElement ? anchorElement.closest('td, th') : null;
+    if (!cell || !elements.preview.contains(cell)) return;
+
+    const row = cell.closest('tr');
+    const table = cell.closest('table');
+    if (!row || !table) return;
+
+    // Cmd + Enter (or Ctrl + Enter) -> Insert row below
+    // Cmd + Shift + Enter (or Ctrl + Shift + Enter) -> Insert row above
+    if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
+      e.preventDefault();
+      e.stopPropagation();
+      if (e.shiftKey) {
+        insertTableRow(row, 'above');
+      } else {
+        insertTableRow(row, 'below');
+      }
+      return;
+    }
+
+    // Tab on the very last cell in table -> Append new row and focus it
+    if (e.key === 'Tab' && !e.shiftKey) {
+      const allRows = table.querySelectorAll('tr');
+      const lastRow = allRows[allRows.length - 1];
+      if (lastRow && row === lastRow) {
+        const lastCell = lastRow.cells[lastRow.cells.length - 1];
+        if (cell === lastCell) {
+          e.preventDefault();
+          e.stopPropagation();
+          insertTableRow(row, 'below');
+          return;
+        }
+      }
+    }
+  });
+}
+
 // Dirty status indicator
 function setDirty(isDirty) {
   state.isDirty = isDirty;
@@ -2593,6 +2859,7 @@ async function init() {
   switchSidebarTab(state.activeSidebarTab);
   syncObsidianModeUI();
   setupViewModeSmartPaste();
+  setupViewModeTableInteractions();
 
   // Initialize Vault Tree in background
   loadVaultTree();
