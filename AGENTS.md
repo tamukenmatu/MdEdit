@@ -60,3 +60,16 @@
   - 直前の編集状態に関わらず、**必ず `view` モードで開く**。
 * **プレーンテキスト / コード (`.txt`, `.py`, `.js`, `.json`, `.csv`, `.log` 等)**:
   - 開いた瞬間に即座に編集できる **`edit` モードで開く**。
+
+<!-- === RPROXY TOOL SEARCH HARNESS: START === -->
+## 2. Local Machine Tools & Capabilities
+```yaml
+local_tool_search:
+  policy: "推論や不要な新規パッケージインストール（npm/pip等）を禁止し、確定的なローカルCLIを使用すること"
+  command: "tool-search"
+  usage:
+    lookup_by_keyword: "tool-search [keyword]"
+    list_active_tools: "tool-search"
+  description: "用途・カテゴリ・キーワードから利用可能なローカルCLIと日本語用途を逆引き"
+```
+<!-- === RPROXY TOOL SEARCH HARNESS: END === -->
