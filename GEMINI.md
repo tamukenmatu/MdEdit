@@ -9,7 +9,7 @@ Antigravity はプロジェクトの進行に伴い、判明した仕様、ア�
 ## 2. Local Machine Tools & Capabilities
 ```yaml
 local_tool_search:
-  policy: "推論や不要な新規パッケージインストール（npm/pip等）を禁止し、確定的なローカルCLIを使用すること"
+  policy: "Tier-1 (rg, jq, fd, uv等) は直接最優先で使用可能。tool-search はリモート機（msi等）連携や特殊ツールの逆引き辞書として使用すること"
   command: "tool-search"
   usage:
     lookup_by_keyword: "tool-search [keyword]"
